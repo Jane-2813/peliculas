@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>IndexedDB Películas</title>
+</head><body>
+  <h1>Películas</h1>
+  <form id="formulario">
+    <input type="text" id="clave" placeholder="Clave" required>
+    <input type="text" id="titulo" placeholder="Título" required>
+    <input type="text" id="genero" placeholder="Género" required>
+    <input type="number" id="fecha" placeholder="Año" required>
+    <button type="submit">Agregar</button>
+  </form>
+
+  <input type="number" id="buscarFecha" placeholder="Buscar por año">
+  <button onclick="buscar()">Buscar</button>
+  <ul id="lista"></ul><script>
+    let db;
+    const request = indexedDB.open("PeliculasDB", 1);
+    request.onupgradeneeded = (e) => {
+      db = e.target.result;
+      const almacen = db.createObjectStore("peliculas", { keyPath: "clave" });
+      almacen.createIndex("BuscarFecha", "fecha", { unique: false });
+    };
+    request.onsuccess = (e) => {
+      db = e.target.result;
+      listar();
+    };
+    document.getElementById("formulario").addEventListener("submit", e => {
+      e.preventDefault();
+      const datos = {
+        clave: document.getElementById("clave").value,
+        titulo: document.getElementById("titulo").value,
+        genero: document.getElementById("genero").value,
+        fecha: parseInt(document.getElementById("fecha").value)
+      };
+      const tx = db.transaction("peliculas", "readwrite");
+      tx.objectStore("peliculas").add(datos);
+      tx.oncomplete = listar;
+    });
+    function listar() {
+      const lista = document.getElementById("lista");
+      lista.innerHTML = "";
+      const tx = db.transaction("peliculas", "readonly");
+      const cursor = tx.objectStore("peliculas").openCursor();
+      cursor.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const li = document.createElement("li");
+          li.textContent = `${cursor.value.titulo} (${cursor.value.fecha})`;
+          const btn = document.createElement("button");
+          btn.textContent = "Eliminar";
+          btn.onclick = () => eliminar(cursor.key);
+          li.appendChild(btn);
+          lista.appendChild(li);
+          cursor.continue();
+        }
+      };
+    }
+    function eliminar(clave) {
+      const tx = db.transaction("peliculas", "readwrite");
+      tx.objectStore("peliculas").delete(clave);
+      tx.oncomplete = listar;
+    }
+    function buscar() {
+      const año = parseInt(document.getElementById("buscarFecha").value);
+      const lista = document.getElementById("lista");
+      lista.innerHTML = "";
+      const tx = db.transaction("peliculas", "readonly");
+      const index = tx.objectStore("peliculas").index("BuscarFecha");
+      const rango = IDBKeyRange.only(año);
+      const cursor = index.openCursor(rango);
+      cursor.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const li = document.createElement("li");
+          li.textContent = `${cursor.value.titulo} (${cursor.value.fecha})`;
+          lista.appendChild(li);
+          cursor.continue();
+        }
+      };
+    }
+ </script></body></html>
